@@ -1,8 +1,7 @@
-
 project_id = "iwbwmwnhdthjkzgbpgil"
 
 [functions.send-verification-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-reset-email]
-verify_jwt = false
+verify_jwt = true
