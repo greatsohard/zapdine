@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { AuthResult, Profile } from '@/types/auth';
 
@@ -36,6 +35,10 @@ class AuthService {
         .eq('username', username)
         .maybeSingle();
 
+      if (checkError) {
+        console.error('Error checking username:', checkError);
+      }
+
       if (existingUser) {
         return { error: { message: 'Username already exists. Please choose a different username.' } };
       }
@@ -70,47 +73,63 @@ class AuthService {
 
   async signIn(identifier: string, password: string): Promise<AuthResult> {
     try {
-      // Try email login first
-      const emailResult = await supabase.auth.signInWithPassword({
-        email: identifier,
-        password
-      });
+      console.log('Attempting sign in with identifier:', identifier);
       
-      // If email login succeeds, return
-      if (!emailResult.error) {
+      // Determine if identifier is email or username
+      const isEmail = identifier.includes('@');
+      
+      if (isEmail) {
+        // Direct email login
+        console.log('Attempting email login');
+        const { error } = await supabase.auth.signInWithPassword({
+          email: identifier,
+          password
+        });
+        
+        if (error) {
+          console.error('Email login error:', error);
+          return { error: { message: 'Invalid email or password. Please check your credentials and try again.' } };
+        }
+        
+        console.log('Email login successful');
+        return { error: null };
+      } else {
+        // Username login - lookup email first
+        console.log('Attempting username login, looking up email');
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('username', identifier)
+          .maybeSingle();
+          
+        if (profileError) {
+          console.error('Username lookup error:', profileError);
+          return { error: { message: 'Invalid username or password. Please check your credentials and try again.' } };
+        }
+        
+        if (!profileData?.email) {
+          console.log('Username not found');
+          return { error: { message: 'Invalid username or password. Please check your credentials and try again.' } };
+        }
+        
+        console.log('Username found, attempting login with email:', profileData.email);
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email: profileData.email,
+          password
+        });
+        
+        if (loginError) {
+          console.error('Username-based login error:', loginError);
+          return { error: { message: 'Invalid username or password. Please check your credentials and try again.' } };
+        }
+        
+        console.log('Username login successful');
         return { error: null };
       }
       
-      // If identifier doesn't contain @ and email login failed, try username lookup
-      if (!identifier.includes('@')) {
-        try {
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('email')
-            .eq('username', identifier)
-            .maybeSingle();
-            
-          if (!profileError && profileData?.email) {
-            const usernameResult = await supabase.auth.signInWithPassword({
-              email: profileData.email,
-              password
-            });
-            
-            if (!usernameResult.error) {
-              return { error: null };
-            }
-          }
-        } catch (usernameError) {
-          console.error('Username lookup error:', usernameError);
-        }
-      }
-      
-      // Return the original email login error
-      return { error: { message: emailResult.error.message } };
-      
     } catch (error: any) {
       console.error('Signin error:', error);
-      return { error: { message: error.message || 'An error occurred during signin' } };
+      return { error: { message: error.message || 'An error occurred during signin. Please try again.' } };
     }
   }
 
