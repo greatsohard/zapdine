@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, Mail, User, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle, Mail, User, ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Auth = () => {
@@ -38,13 +37,109 @@ const Auth = () => {
     }
   }, [user, navigate]);
 
+  const validateForm = () => {
+    if (!isLogin && !isForgotPassword) {
+      // Sign up validation
+      if (!fullName.trim()) {
+        toast({
+          title: "Error",
+          description: "Please enter your full name",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!username.trim()) {
+        toast({
+          title: "Error",
+          description: "Please enter a username",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (username.trim().length < 3) {
+        toast({
+          title: "Error",
+          description: "Username must be at least 3 characters long",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) {
+        toast({
+          title: "Error",
+          description: "Username can only contain letters, numbers, and underscores",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!email.trim()) {
+        toast({
+          title: "Error",
+          description: "Please enter your email address",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (password.length < 6) {
+        toast({
+          title: "Error",
+          description: "Password must be at least 6 characters long",
+          variant: "destructive"
+        });
+        return false;
+      }
+    } else if (isLogin && !isForgotPassword) {
+      // Sign in validation
+      if (!identifier.trim()) {
+        toast({
+          title: "Error",
+          description: `Please enter your ${loginType === 'email' ? 'email address' : 'username'}`,
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!password.trim()) {
+        toast({
+          title: "Error",
+          description: "Please enter your password",
+          variant: "destructive"
+        });
+        return false;
+      }
+    } else if (isForgotPassword) {
+      // Password reset validation
+      if (!email.trim()) {
+        toast({
+          title: "Error",
+          description: "Please enter your email address",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        toast({
+          title: "Error",
+          description: "Please enter a valid email address",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
     setLoading(true);
 
     try {
       if (isForgotPassword) {
-        const { error } = await resetPassword(email);
+        const { error } = await resetPassword(email.trim());
         if (error) {
           toast({
             title: "Reset Failed",
@@ -56,7 +151,7 @@ const Auth = () => {
           setEmail('');
         }
       } else if (isLogin) {
-        const result = await signIn(identifier, password);
+        const result = await signIn(identifier.trim(), password);
         
         if (result.error) {
           toast({
@@ -72,26 +167,9 @@ const Auth = () => {
           navigate('/dashboard');
         }
       } else {
-        // Sign up validation
-        if (!fullName.trim()) {
-          toast({
-            title: "Error",
-            description: "Please enter your full name",
-            variant: "destructive"
-          });
-          return;
-        }
-        if (!username.trim()) {
-          toast({
-            title: "Error",
-            description: "Please enter a username",
-            variant: "destructive"
-          });
-          return;
-        }
-
+        // Sign up
         console.log('Submitting signup');
-        const { error } = await signUp(email, password, fullName.trim(), username.trim());
+        const { error } = await signUp(email.trim(), password, fullName.trim(), username.trim());
         if (error) {
           console.error('Signup failed:', error);
           toast({
@@ -254,6 +332,19 @@ const Auth = () => {
           </Alert>
         )}
 
+        {/* Demo Account Info */}
+        {isLogin && !isForgotPassword && (
+          <Alert className="mb-6 border-blue-200 bg-blue-50">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Demo Account:</strong><br />
+              Email: demo@zapdine.com<br />
+              Password: demo123<br />
+              <em>Or create your own account below!</em>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card className="border-amber-100 shadow-lg">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -315,10 +406,13 @@ const Auth = () => {
                           type="text"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          placeholder="Choose a username"
+                          placeholder="Choose a username (letters, numbers, underscore only)"
                           required
                           className="focus:border-amber-500 focus:ring-amber-500"
+                          minLength={3}
+                          pattern="[a-zA-Z0-9_]+"
                         />
+                        <p className="text-xs text-gray-500">At least 3 characters, letters, numbers and underscore only</p>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="email">Email Address *</Label>
